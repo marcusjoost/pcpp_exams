@@ -31,7 +31,7 @@ public class TestKMeans {
         final Point[] points = GenerateData.randomPoints(n);
         final int[] initialPoints = GenerateData.randomIndexes(n, k);
         for (int i = 0; i < 3; i++) {
-            timeKMeans(new KMeans1P(points, k), initialPoints);
+            timeKMeans(new KMeans1(points, k), initialPoints);
             // timeKMeans(new KMeans1P(points, k), initialPoints);
             // timeKMeans(new KMeans2(points, k), initialPoints);
             // timeKMeans(new KMeans2P(points, k), initialPoints);
@@ -192,7 +192,7 @@ class KMeans1P implements KMeans {
             { // Update step: recompute mean of each cluster
                 Cluster[] newClusters = new Cluster[clusters.length];
                 ArrayList<Future> tasks = new ArrayList<Future>();
-                for(int i = 0; i < tasks.size(); i++){
+                for(int i = 0; i < clusters.length; i++){
                     Cluster c = clusters[i];
                     final int clusterIndex = i;
                     tasks.add(executor.submit(() -> {
