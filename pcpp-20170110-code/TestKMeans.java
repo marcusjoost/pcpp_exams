@@ -380,21 +380,19 @@ class KMeans2P implements KMeans {
         while (!converged) {
             iterations++;
             {
+                // Assignment step: put each point in exactly one cluster
                 ArrayList<Future<?>> tasks = new ArrayList<Future<?>>();
                 for(int i = 0; i < taskCount; i++) {
-                    int to = i * work_per_task_range;
-                    int from = (i + 1 == taskCount) ? points.length : work_per_task_range * (i + 1); 
-                    Cluster[] cs = clusters;
-                    Cluster[] mcs = myCluster;
-                    // Assignment step: put each point in exactly one cluster
+                    int from = i * work_per_task_range;
+                    int to = (i + 1 == taskCount) ? points.length : work_per_task_range * (i + 1); 
                     tasks.add(executor.submit(() -> {
                         for (int pi = from; pi < to; pi++) {
                             Point p = points[pi];
                             Cluster best = null;
-                            for (Cluster c : cs)
+                            for (Cluster c : clusters)
                                 if (best == null || p.sqrDist(c.mean) < p.sqrDist(best.mean))
                                     best = c;
-                            mcs[pi] = best;
+                            myCluster[pi] = best;
                         }
                     }));
                 }
@@ -409,13 +407,29 @@ class KMeans2P implements KMeans {
             }  
             {
                 // Update step: recompute mean of each cluster
-                for (Cluster c : clusters)
-                    c.resetMean();
-                for (int pi = 0; pi < points.length; pi++)
-                    myCluster[pi].addToMean(points[pi]);
                 converged = true;
-                for (Cluster c : clusters)
-                    converged &= c.computeNewMean();
+                ArrayList<Future> tasks = new ArrayList<Future>();
+                for(int i = 0; i < taskCount; i++) {
+                    int to = i * work_per_task_range;
+                    int from = (i + 1 == taskCount) ? clusters.length : work_per_task_range * (i + 1);
+                    tasks.add(executor.submit(() -> {
+                        for (int pi = from; pi < to; pi++) {
+                            clusters[pi].resetMean();
+                            myCluster[pi].addToMean(points[pi]);
+                            return converged &= clusters[pi].computeNewMean();
+                        }
+                    }));
+                }
+                for(Future<Boolean> task : tasks) {
+                    try {
+                        boolean res = task.get();
+                        if(!res) {
+                            converged = false;
+                        }
+                    } catch (Exception e) {
+
+                    }
+                }
             }
             // System.out.printf("[%d]", iterations); // To diagnose infinite loops
         }
