@@ -31,7 +31,7 @@ public class TestKMeans {
         final Point[] points = GenerateData.randomPoints(n);
         final int[] initialPoints = GenerateData.randomIndexes(n, k);
         for (int i = 0; i < 3; i++) {
-            timeKMeans(new KMeans2P (points, k), initialPoints);
+            timeKMeans(new KMeans1P (points, k), initialPoints);
             // timeKMeans(new KMeans1P(points, k), initialPoints);
             // timeKMeans(new KMeans2(points, k), initialPoints);
             // timeKMeans(new KMeans2P(points, k), initialPoints);
@@ -408,29 +408,29 @@ class KMeans2P implements KMeans {
             {
                 // Update step: recompute mean of each cluster
                 converged = true;
-                ArrayList<Future> tasks = new ArrayList<Future>();
+                ArrayList<Future<Boolean>> tasks2 = new ArrayList<Future<Boolean>>();
                 for(int i = 0; i < taskCount; i++) {
                     int to = i * work_per_task_range;
                     int from = (i + 1 == taskCount) ? clusters.length : work_per_task_range * (i + 1);
-                    tasks.add(executor.submit(() -> {
+                    tasks2.add(executor.submit(() -> {
+                        boolean convergedTask = true;
                         for (int pi = from; pi < to; pi++) {
                             clusters[pi].resetMean();
                             myCluster[pi].addToMean(points[pi]);
-                            boolean convergedTask = true;
                             if(!clusters[pi].computeNewMean()){
                                 convergedTask = false;
                             }
-                            return convergedTask;
                         }
+                        return convergedTask;
                     }));
-                }
-                for(Future<Boolean> task : tasks) {
-                    try {
-                        boolean res = task.get();
-                        if(!res) {
-                            converged = false;
-                        }
-                    } catch (Exception e) {}
+                    for(Future<Boolean> task : tasks2) {
+                        try {
+                            boolean res = task.get();
+                            if(!res) {
+                                converged = false;
+                            }
+                        } catch (Exception e) {}
+                    }
                 }
             }
             // System.out.printf("[%d]", iterations); // To diagnose infinite loops
