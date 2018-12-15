@@ -416,7 +416,11 @@ class KMeans2P implements KMeans {
                         for (int pi = from; pi < to; pi++) {
                             clusters[pi].resetMean();
                             myCluster[pi].addToMean(points[pi]);
-                            return converged &= clusters[pi].computeNewMean();
+                            boolean convergedTask = true;
+                            if(!clusters[pi].computeNewMean()){
+                                convergedTask = false;
+                            }
+                            return convergedTask;
                         }
                     }));
                 }
@@ -426,9 +430,7 @@ class KMeans2P implements KMeans {
                         if(!res) {
                             converged = false;
                         }
-                    } catch (Exception e) {
-
-                    }
+                    } catch (Exception e) {}
                 }
             }
             // System.out.printf("[%d]", iterations); // To diagnose infinite loops
