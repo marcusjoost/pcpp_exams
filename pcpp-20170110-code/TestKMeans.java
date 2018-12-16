@@ -31,7 +31,7 @@ public class TestKMeans {
         final Point[] points = GenerateData.randomPoints(n);
         final int[] initialPoints = GenerateData.randomIndexes(n, k);
         for (int i = 0; i < 3; i++) {
-            timeKMeans(new KMeans1P (points, k), initialPoints);
+            timeKMeans(new KMeans2P (points, k), initialPoints);
             // timeKMeans(new KMeans1P(points, k), initialPoints);
             // timeKMeans(new KMeans2(points, k), initialPoints);
             // timeKMeans(new KMeans2P(points, k), initialPoints);
@@ -406,32 +406,46 @@ class KMeans2P implements KMeans {
                 }
             }  
             {
-                // Update step: recompute mean of each cluster
-                converged = true;
-                ArrayList<Future<Boolean>> tasks2 = new ArrayList<Future<Boolean>>();
+                for (Cluster c : clusters)
+                    c.resetMean();
+
+
+                ArrayList<Future<?>> tasks2 = new ArrayList<Future<?>>();
                 for(int i = 0; i < taskCount; i++) {
-                    int to = i * work_per_task_range;
-                    int from = (i + 1 == taskCount) ? clusters.length : work_per_task_range * (i + 1);
+                    int from = i * work_per_task_range;
+                    int to = (i + 1 == taskCount) ? clusters.length : work_per_task_range * (i + 1);
                     tasks2.add(executor.submit(() -> {
-                        boolean convergedTask = true;
                         for (int pi = from; pi < to; pi++) {
-                            clusters[pi].resetMean();
-                            myCluster[pi].addToMean(points[pi]);
-                            if(!clusters[pi].computeNewMean()){
-                                convergedTask = false;
+                            synchronized(myCluster[pi]){
+                                myCluster[pi].addToMean(points[pi]);
                             }
                         }
-                        return convergedTask;
                     }));
-                    for(Future<Boolean> task : tasks2) {
+                    for(Future<?> task : tasks2) {
                         try {
-                            boolean res = task.get();
-                            if(!res) {
-                                converged = false;
-                            }
+                            task.get();
                         } catch (Exception e) {}
                     }
                 }
+
+                final AtomicBoolean convergedTask = new AtomicBoolean(true);
+
+                List<Future<?>> tasks3 = new ArrayList<Future<?>>();
+                for (Cluster c : clusters){
+                    tasks3.add(executor.submit(() -> {
+                        boolean newMean = c.computeNewMean();
+                        if(!newMean) {
+                            convergedTask.set(false);
+                        }
+                    }));
+                }
+
+                for(Future<?> task : tasks3){
+                    try{
+                        task.get();
+                    } catch (Exception e) {}
+                }
+                converged = convergedTask.get();
             }
             // System.out.printf("[%d]", iterations); // To diagnose infinite loops
         }
